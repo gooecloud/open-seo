@@ -11,7 +11,8 @@ import { pgDb } from "@/db/pg/client";
 import * as pgSchema from "@/db/pg/schema";
 import { getDatabaseProvider } from "@/db/provider";
 import { z } from "zod";
-import { isHostedAuthMode } from "@/lib/auth-mode";
+import { isAccessSessionAuthMode, isHostedAuthMode } from "@/lib/auth-mode";
+import { accessSessionPlugin } from "@/server/auth/access-session-plugin";
 import { createApiKeyPlugin } from "@/lib/auth-api-key";
 import { createBaseAuthConfig } from "@/lib/auth-config";
 import {
@@ -43,9 +44,10 @@ function createAuth() {
   // Hosted needs the real configured URL (cookies, callbacks, /api/auth routes
   // all use it). Self-hosted only builds this instance to mint/refresh Search
   // Console tokens, which never read baseURL — so a placeholder is fine there.
-  const baseUrl = isHostedAuthMode(env.AUTH_MODE)
-    ? getHostedBaseUrl()
-    : "http://localhost";
+  const baseUrl =
+    isHostedAuthMode(env.AUTH_MODE) || isAccessSessionAuthMode(env.AUTH_MODE)
+      ? env.BETTER_AUTH_URL?.trim() || "http://localhost"
+      : "http://localhost";
   const bypassEmail = Reflect.get(env, "BYPASS_EMAIL_VERIFICATION") === "true";
   const baseAuthConfig = createBaseAuthConfig(
     isHostedAuthMode(env.AUTH_MODE)
@@ -160,6 +162,16 @@ function createAuth() {
       },
     },
     ...baseAuthConfig,
+    ...(isAccessSessionAuthMode(env.AUTH_MODE)
+      ? {
+          session: {
+            ...baseAuthConfig.session,
+            expiresIn: 90 * 24 * 60 * 60,
+            updateAge: 15 * 24 * 60 * 60,
+            cookieCache: { enabled: false },
+          },
+        }
+      : {}),
     emailAndPassword: {
       ...baseAuthConfig.emailAndPassword,
       requireEmailVerification: !bypassEmail,
@@ -196,6 +208,7 @@ function createAuth() {
     plugins: [
       ...baseAuthConfig.plugins,
       ...(isHostedAuthMode(env.AUTH_MODE) ? [createApiKeyPlugin()] : []),
+      ...(isAccessSessionAuthMode(env.AUTH_MODE) ? [accessSessionPlugin()] : []),
       ...(turnstileSecretKey
         ? [
             captcha({
@@ -378,6 +391,15 @@ function hasHostedAuthEmailConfig() {
 
 export function hasHostedAuthConfig() {
   try {
+    if (isAccessSessionAuthMode(env.AUTH_MODE)) {
+      return Boolean(
+        env.BETTER_AUTH_URL?.trim() &&
+        getHostedSecret() &&
+        env.ACCESS_ALLOWED_EMAILS?.trim() &&
+        env.TEAM_DOMAIN?.trim() &&
+        env.POLICY_AUD?.trim(),
+      );
+    }
     getHostedBaseUrl();
     getHostedSecret();
     getGoogleSocialProviderConfig();
