@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
-import { getAuthMode, isHostedAuthMode } from "@/lib/auth-mode";
+import { getAuthMode, isAccessSessionAuthMode, isHostedAuthMode } from "@/lib/auth-mode";
+import { resolveAccessSessionContext } from "@/server/auth/access-session";
 import { resolveCloudflareAccessContext } from "./cloudflareAccess";
 import { resolveLocalNoAuthContext } from "./delegated";
 import { resolveHostedContext } from "./hosted";
@@ -14,6 +15,9 @@ export async function resolveUserContextFromHeaders(
   const authMode = getAuthMode(env.AUTH_MODE);
   if (authMode === "local_noauth") {
     return resolveLocalNoAuthContext();
+  }
+  if (isAccessSessionAuthMode(authMode)) {
+    return resolveAccessSessionContext(headers);
   }
   if (isHostedAuthMode(authMode)) {
     return resolveHostedContext(headers);
