@@ -26,6 +26,7 @@ import {
 import { normalizeClientRegistrationRequest } from "@/server/mcp/oauth-registration";
 import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { resolveHostedContext } from "@/middleware/ensure-user/hosted";
+import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve";
 import { handleMcpApiKeyRequest } from "@/server/mcp/api-key-auth";
 
 const OAUTH_AUTHORIZE_PATH = "/api/auth/oauth2/authorize";
@@ -161,7 +162,7 @@ function csrfProtected(request: Request) {
 
 async function getAuthorizeSessionBlocker(request: Request) {
   try {
-    await resolveHostedContext(request.headers);
+    await resolveUserContextFromHeaders(request.headers);
     return null;
   } catch (error) {
     const appError = asAppError(error);
@@ -181,7 +182,7 @@ async function getAuthorizeSessionBlocker(request: Request) {
 
 async function resolveContextForConsent(request: Request) {
   try {
-    return await resolveHostedContext(request.headers);
+    return await resolveUserContextFromHeaders(request.headers);
   } catch (error) {
     const appError = asAppError(error);
     if (appError?.code === "UNAUTHENTICATED") {
