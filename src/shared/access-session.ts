@@ -1,28 +1,21 @@
-export const ACCESS_SESSION_BRIDGE_PATH = "/auth/access-bridge";
-export const ACCESS_SESSION_STATUS_PATH = "/api/auth/access-session";
-export const ACCESS_SESSION_LOGOUT_PATH = "/api/auth/access-session/logout";
-export const ACCESS_SESSION_REVOKE_PATH = "/api/auth/access-session/revoke";
-
-export function parseAccessSessionEmailAllowlist(value: string | undefined) {
-  return new Set(
-    (value ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
+export const ACCESS_SESSION_LOGIN_PATH = "/api/auth/access-session/login";
+export const ACCESS_SESSION_REVOKE_USER_PATH =
+  "/api/auth/access-session/revoke-user";
 
 export function isAccessSessionEmailAllowed(
   email: string,
   allowlist: string | undefined,
 ) {
-  return parseAccessSessionEmailAllowlist(allowlist).has(
-    email.trim().toLowerCase(),
-  );
+  return new Set(
+    (allowlist ?? "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  ).has(email.trim().toLowerCase());
 }
 
 export function getSafeAccessSessionReturnTo(
-  value: string | null,
+  value: string | undefined,
   origin: string,
 ) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -33,7 +26,7 @@ export function getSafeAccessSessionReturnTo(
     const target = new URL(value, origin);
     if (
       target.origin !== origin ||
-      target.pathname === ACCESS_SESSION_BRIDGE_PATH
+      target.pathname === ACCESS_SESSION_LOGIN_PATH
     ) {
       return "/";
     }
