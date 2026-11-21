@@ -2,23 +2,19 @@ import { describe, expect, it } from "vitest";
 import {
   getSafeAccessSessionReturnTo,
   isAccessSessionEmailAllowed,
-  parseAccessSessionEmailAllowlist,
 } from "./access-session";
 
-describe("access session allowlist", () => {
-  it("normalizes email addresses and ignores empty entries", () => {
-    expect(
-      parseAccessSessionEmailAllowlist(" Admin@Example.com, , team@example.com "),
-    ).toEqual(new Set(["admin@example.com", "team@example.com"]));
-  });
-
-  it("matches employee email addresses case-insensitively", () => {
+describe("isAccessSessionEmailAllowed", () => {
+  it("matches normalized email addresses", () => {
     expect(
       isAccessSessionEmailAllowed(
         "TEAM@example.com",
-        "admin@example.com,team@example.com",
+        "admin@example.com, team@example.com",
       ),
     ).toBe(true);
+  });
+
+  it("denies missing and unlisted email addresses", () => {
     expect(
       isAccessSessionEmailAllowed("other@example.com", "team@example.com"),
     ).toBe(false);
@@ -33,15 +29,18 @@ describe("getSafeAccessSessionReturnTo", () => {
 
   it("preserves a same-origin path and query", () => {
     expect(
-      getSafeAccessSessionReturnTo("/api/auth/oauth2/authorize?client_id=abc", origin),
+      getSafeAccessSessionReturnTo(
+        "/api/auth/oauth2/authorize?client_id=abc",
+        origin,
+      ),
     ).toBe("/api/auth/oauth2/authorize?client_id=abc");
   });
 
   it.each([
     "https://evil.example/path",
     "//evil.example/path",
-    "/auth/access-bridge?returnTo=%2F",
-    null,
+    "/api/auth/access-session/login?returnTo=%2F",
+    undefined,
     "",
   ])("falls back to the root for unsafe return targets: %s", (value) => {
     expect(getSafeAccessSessionReturnTo(value, origin)).toBe("/");
