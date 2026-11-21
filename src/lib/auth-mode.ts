@@ -4,6 +4,7 @@ export const AUTH_MODES = [
   "cloudflare_access",
   "local_noauth",
   "hosted",
+  "access_session",
 ] as const;
 
 type AuthMode = (typeof AUTH_MODES)[number];
@@ -31,6 +32,14 @@ export function getAuthMode(value: string | null | undefined): AuthMode {
 
 export function isHostedAuthMode(value: string | null | undefined) {
   return getAuthMode(value) === "hosted";
+}
+
+export function isAccessSessionAuthMode(value: string | null | undefined) {
+  return getAuthMode(value) === "access_session";
+}
+
+export function isAccessSessionClientAuthMode() {
+  return import.meta.env.AUTH_MODE === "access_session";
 }
 
 export function isHostedClientAuthMode() {
