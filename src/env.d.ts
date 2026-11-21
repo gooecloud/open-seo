@@ -28,10 +28,12 @@ declare namespace Cloudflare {
     // oxlint-disable-next-line typescript-eslint/consistent-type-imports
     AUDIT_ENGINE: Service<typeof import("./audit-worker").default>;
 
-    AUTH_MODE?: "cloudflare_access" | "local_noauth" | "hosted";
+    AUTH_MODE?: "cloudflare_access" | "local_noauth" | "hosted" | "access_session";
     BYPASS_EMAIL_VERIFICATION?: string;
     TEAM_DOMAIN?: string;
     POLICY_AUD?: string;
+    ACCESS_ALLOWED_EMAILS?: string;
+    ACCESS_SESSION_ADMIN_EMAILS?: string;
     POSTHOG_PUBLIC_KEY?: string;
     POSTHOG_HOST?: string;
     BETTER_AUTH_SECRET?: string;
@@ -86,7 +88,7 @@ declare namespace Cloudflare {
 }
 
 interface ImportMetaEnv {
-  readonly AUTH_MODE?: "cloudflare_access" | "local_noauth" | "hosted";
+  readonly AUTH_MODE?: "cloudflare_access" | "local_noauth" | "hosted" | "access_session";
   readonly DATABASE_PROVIDER?: "d1" | "postgres";
   readonly BYPASS_EMAIL_VERIFICATION?: string;
   readonly POSTHOG_PUBLIC_KEY?: string;
