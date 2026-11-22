@@ -1,11 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { APIError, createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
 import { setSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import { db } from "@/db";
-import { user as authUser } from "@/db/schema";
+import { session as authSession, user as authUser } from "@/db/schema";
 import { resolveCloudflareAccessContext } from "@/middleware/ensure-user/cloudflareAccess";
 import { asAppError } from "@/server/lib/errors";
 import {
@@ -68,9 +68,13 @@ export function accessSessionPlugin() {
             });
           }
 
+          // A prior Access session must not be reusable after the user's
+          // employee allowlist entry is removed or their Access identity is
+          // re-bound. Create a fresh, explicit 90-day persistent session.
           const session = await ctx.context.internalAdapter.createSession(
             user.id,
             false,
+            { activeOrganizationId: identity.organizationId },
           );
           if (!session) {
             throw new APIError("INTERNAL_SERVER_ERROR", {
@@ -78,7 +82,9 @@ export function accessSessionPlugin() {
             });
           }
 
-          await setSessionCookie(ctx, { session, user });
+          await setSessionCookie(ctx, { session, user }, false, {
+            maxAge: 90 * 24 * 60 * 60,
+          });
 
           const origin = new URL(ctx.request.url).origin;
           const returnTo = getSafeAccessSessionReturnTo(
