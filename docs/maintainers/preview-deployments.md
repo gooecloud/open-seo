@@ -7,8 +7,10 @@ Alchemy-managed Cloudflare Access boundary.
 
 - Preview Workers are named `open-seo-<stage>` and served from
   `open-seo-<stage>.<WORKERS_SUBDOMAIN>`.
-- One persistent Access application protects
-  `open-seo-*.<WORKERS_SUBDOMAIN>` before any preview Worker exists.
+- One persistent Access application protects only
+  `open-seo-*.<WORKERS_SUBDOMAIN>/api/auth/access-session/login`.
+  The app root is not challenged; Better Auth enforces the 90-day rolling
+  application session on protected pages and API calls.
 - Production uses the unsuffixed `open-seo` Worker on `app.openseo.so` and
   `www.app.openseo.so`. It does not match the preview wildcard and is not
   placed behind preview Access.
@@ -92,11 +94,11 @@ Two alchemy conventions to know: omitting `--stage` targets alchemy's default
 per-user stage (`dev_$USER`), and stage `hosted-prod` with `.env.preview` fails
 in the stack (no `BETTER_AUTH_URL`) — use `pnpm deploy:postgres` for production.
 
-Each preview starts with an empty database: open the URL, pass the Access
-challenge, and you're in. Previews default to `AUTH_MODE=local_noauth`, so
-everyone allowed through the gate shares one auto-created admin account — set
-`AUTH_MODE=hosted` in `.env.preview` (see the example file) to exercise the
-real sign-up flow instead.
+Each preview starts with an empty D1 database. In `access_session` mode the
+app root is reachable without an Access challenge. The first visit redirects
+to the Access-protected bootstrap login endpoint; after identity validation,
+Better Auth issues a 90-day persistent, rolling session. The session is
+revalidated against D1 on every protected request.
 
 Destroy the stage (state is shared via the Cloudflare state store, so any
 machine with credentials can do this):
