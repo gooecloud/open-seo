@@ -25,7 +25,6 @@ import {
 } from "@/server/mcp/context";
 import { normalizeClientRegistrationRequest } from "@/server/mcp/oauth-registration";
 import { getPublicOrigin } from "@/server/mcp/public-origin";
-import { resolveHostedContext } from "@/middleware/ensure-user/hosted";
 import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve";
 import { handleMcpApiKeyRequest } from "@/server/mcp/api-key-auth";
 
