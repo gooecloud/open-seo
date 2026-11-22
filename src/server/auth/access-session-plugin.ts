@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { APIError, createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
 import type { BetterAuthPlugin } from "better-auth";
@@ -107,6 +107,11 @@ export function accessSessionPlugin() {
           if (!actor?.user?.email) {
             throw new APIError("UNAUTHORIZED", {
               message: "A valid SEO application session is required",
+            });
+          }
+          if (!isAllowedEmail(actor.user.email)) {
+            throw new APIError("FORBIDDEN", {
+              message: "This account is no longer on the SEO employee allowlist",
             });
           }
           if (!isAdminEmail(actor.user.email)) {
