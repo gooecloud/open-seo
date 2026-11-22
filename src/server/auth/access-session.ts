@@ -9,6 +9,17 @@ export function isAccessSessionAllowed(email: string) {
   return isAccessSessionEmailAllowed(email, env.ACCESS_ALLOWED_EMAILS);
 }
 
+export async function resolveAccessSessionOAuthContext(
+  userId: string,
+  userEmail: string,
+): Promise<EnsuredUserContext | null> {
+  if (!env.ACCESS_ALLOWED_EMAILS?.trim() || !isAccessSessionAllowed(userEmail)) {
+    return null;
+  }
+
+  return resolveSharedWorkspaceContext(userId, userEmail);
+}
+
 export async function resolveAccessSessionContext(
   headers: Headers,
 ): Promise<EnsuredUserContext> {
