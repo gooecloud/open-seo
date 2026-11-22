@@ -1,4 +1,5 @@
-import { waitUntil } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
+import { isAccessSessionAuthMode } from "@/lib/auth-mode";
 import {
   AuthorizationError,
   OAuthError,
@@ -83,6 +84,15 @@ function getRelativeRequestTarget(request: Request) {
 }
 
 function redirectToSignIn(request: Request) {
+  if (isAccessSessionAuthMode(env.AUTH_MODE)) {
+    const loginUrl = new URL(
+      "/api/auth/access-session/login",
+      request.url,
+    );
+    loginUrl.searchParams.set("returnTo", getRelativeRequestTarget(request));
+    return Response.redirect(loginUrl.toString(), 302);
+  }
+
   const signInUrl = new URL("/sign-in", request.url);
   signInUrl.searchParams.set("redirect", getRelativeRequestTarget(request));
   return Response.redirect(signInUrl.toString(), 302);
