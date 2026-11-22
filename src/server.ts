@@ -11,7 +11,11 @@ import { SCHEDULED_RANK_CHECKS_PAUSED } from "@/shared/rank-tracking-pause";
 import { reconcileStaleAudits } from "@/server/features/audit/services/auditReconciler";
 import { getOrCreateOrganizationCustomer } from "@/server/billing/subscription";
 import { isHostedServerAuthMode } from "@/server/lib/runtime-env";
-import { getAuthMode, isHostedAuthMode } from "@/lib/auth-mode";
+import {
+  getAuthMode,
+  isAccessSessionAuthMode,
+  isHostedAuthMode,
+} from "@/lib/auth-mode";
 import {
   createOpenSeoOAuthProvider,
   type OpenSeoOAuthEnv,
@@ -160,7 +164,7 @@ function handleFetch(
     return routeChatAgents(publicRequest, env);
   }
 
-  if (isHostedAuthMode(authMode)) {
+  if (isHostedAuthMode(authMode) || isAccessSessionAuthMode(authMode)) {
     if (pathname === AUTUMN_WEBHOOK_PATH) {
       return handleAutumnWebhookRequest(publicRequest);
     }
