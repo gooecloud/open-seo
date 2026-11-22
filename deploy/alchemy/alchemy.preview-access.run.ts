@@ -30,12 +30,12 @@ export default Alchemy.Stack(
       "Set ACCESS_ALLOWED_EMAILS to the comma-separated preview testers.",
     );
 
-    const hostname = previewWildcard(subdomain);
+    const hostname = `${previewWildcard(subdomain)}/api/auth/access-session/login`;
     const application = yield* emailAccessGate({
       policyId: "PreviewAllowTeam",
       applicationId: "PreviewAccess",
       policyName: "open-seo preview team",
-      applicationName: "open-seo preview environments",
+      applicationName: "open-seo preview bootstrap login",
       domain: hostname,
       emails: allowedEmails,
     });
