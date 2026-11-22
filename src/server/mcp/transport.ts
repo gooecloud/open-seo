@@ -240,7 +240,7 @@ export async function handleAuthenticatedOpenSeoMcpRequest(
 
 export async function handleSelfHostedOpenSeoMcpRequest(
   request: Request,
-  authMode: "cloudflare_access" | "local_noauth",
+  authMode: "cloudflare_access" | "local_noauth" | "access_session",
   env: unknown,
   ctx: ExecutionContext,
 ): Promise<Response> {
