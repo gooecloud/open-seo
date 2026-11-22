@@ -1,4 +1,7 @@
+import { and, eq, gt, like } from "drizzle-orm";
 import { env } from "cloudflare:workers";
+import { db } from "@/db";
+import { session as authSession, user as authUser } from "@/db/schema";
 import { isAccessSessionEmailAllowed } from "@/shared/access-session";
 import { getAuth } from "@/lib/auth";
 import { resolveSharedWorkspaceContext } from "@/middleware/ensure-user/delegated";
@@ -17,7 +20,25 @@ export async function resolveAccessSessionOAuthContext(
     return null;
   }
 
-  return resolveSharedWorkspaceContext(userId, userEmail);
+  const user = await db.query.user.findFirst({
+    columns: { id: true, email: true },
+    where: eq(authUser.id, userId),
+  });
+  if (!user || user.email.trim().toLowerCase() !== userEmail.trim().toLowerCase()) {
+    return null;
+  }
+
+  const activeSession = await db.query.session.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(authSession.userId, userId),
+      like(authSession.token, "%"),
+      gt(authSession.expiresAt, new Date()),
+    ),
+  });
+  if (!activeSession) return null;
+
+  return resolveSharedWorkspaceContext(user.id, user.email);
 }
 
 export async function resolveAccessSessionContext(
