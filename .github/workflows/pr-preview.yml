@@ -83,6 +83,7 @@ jobs:
             *) echo "::error::ENV_PREVIEW secret is missing a valid WORKERS_SUBDOMAIN (needed to derive and verify the preview URL)"; exit 1 ;;
           esac
           echo "PREVIEW_URL=https://open-seo-${STAGE}.${subdomain}" >> "$GITHUB_ENV"
+          echo "ACCESS_LOGIN_URL=https://open-seo-${STAGE}.${subdomain}/api/auth/access-session/login" >> "$GITHUB_ENV"
 
       # Same command as a local preview deploy: vite build, alchemy deploy.
       # State lives in the account's Cloudflare state store; CI resolves its
@@ -93,32 +94,29 @@ jobs:
         if: github.event.action != 'closed'
         run: pnpm deploy:preview --stage "$STAGE" --yes
 
-      # Fail the job (and skip the URL comment) if the deployed preview
-      # answers without a Cloudflare Access login redirect. A definitive app
-      # response (2xx–4xx except 404, no Access redirect) fails immediately;
-      # retries are only for propagation-era errors, including workers.dev 404s.
-      # (Cloudflare version preview URLs sit outside this wildcard, but alchemy
-      # uploads versions with no preview provisioned, so none are served — see
-      # docs/maintainers/preview-deployments.md.)
-      - name: Verify Access protection
+      # Root must not be challenged; the one-time bootstrap endpoint must be.
+      - name: Verify preview authentication boundary
         if: github.event.action != 'closed'
         run: |
           for attempt in 1 2 3 4 5 6 7 8; do
-            response=$(curl -sS -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "$PREVIEW_URL") || response=""
-            code="${response%% *}"
-            location="${response#* }"
-            case "$location" in
-              https://*.cloudflareaccess.com/cdn-cgi/access/login*)
-                exit 0 ;;
+            root=$(curl -sS -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "$PREVIEW_URL") || root=""
+            login=$(curl -sS -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "$ACCESS_LOGIN_URL") || login=""
+            root_code="${root%% *}"
+            login_location="${login#* }"
+            case "$login_location" in
+              https://*.cloudflareaccess.com/cdn-cgi/access/login*) ;;
+              *)
+                echo "attempt $attempt: bootstrap path not protected (${login:-no response})"
+                sleep 5
+                continue ;;
             esac
-            if [ -n "$code" ] && [ "$code" -ge 200 ] && [ "$code" -lt 500 ] && [ "$code" != 404 ]; then
-              echo "::error::$PREVIEW_URL responded (HTTP $code) WITHOUT a Cloudflare Access challenge — the preview is public; destroy the stage (pnpm destroy:preview --stage $STAGE --yes)"
-              exit 1
-            fi
-            echo "attempt $attempt: not up yet (${response:-no response})"
+            case "$root_code" in
+              200|301|302|303|307|308|401) exit 0 ;;
+            esac
+            echo "attempt $attempt: app root unavailable (${root:-no response})"
             sleep 5
           done
-          echo "::error::Could not verify Cloudflare Access protection for $PREVIEW_URL after 8 attempts (possibly workers.dev propagation); re-run this job or verify manually before sharing the preview"
+          echo "::error::Expected public app root and Access-protected bootstrap login path."
           exit 1
 
       - name: Destroy preview stage
