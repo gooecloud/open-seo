@@ -252,7 +252,10 @@ const resolveSelfHostAccess = (
         applicationId: "SelfHostAccess",
         policyName: `open-seo ${stage} self-host users`,
         applicationName: `open-seo ${stage}`,
-        domain: `${workerName(stage)}.${subdomain}`,
+        domain:
+          authMode === "access_session"
+            ? `${workerName(stage)}.${subdomain}/api/auth/access-session/login`
+            : `${workerName(stage)}.${subdomain}`,
         emails: allowedEmails,
       });
       policyAud = application.aud;
@@ -269,6 +272,8 @@ const dataEnv = {
   // AUTH_MODE, DATABASE_PROVIDER, BETTER_AUTH_URL, TEAM_DOMAIN, and
   // POLICY_AUD are stage-dependent and set in the stack body below.
   DATAFORSEO_API_KEY: Config.redacted("DATAFORSEO_API_KEY"),
+  ACCESS_ALLOWED_EMAILS: optionalVar("ACCESS_ALLOWED_EMAILS"),
+  ACCESS_SESSION_ADMIN_EMAILS: optionalVar("ACCESS_SESSION_ADMIN_EMAILS"),
   BYPASS_EMAIL_VERIFICATION: optionalVar("BYPASS_EMAIL_VERIFICATION"),
   BETTER_AUTH_SECRET: optionalSecret("BETTER_AUTH_SECRET"),
   CRAWLER_ACCESS_SECRET: optionalSecret("CRAWLER_ACCESS_SECRET"),
@@ -357,9 +362,27 @@ export default Alchemy.Stack(
       authUrl = "";
     }
 
+    if (authMode === "access_session" && !prod) {
+      if (!workersSubdomain || !authUrl) {
+        return yield* Effect.die(
+          new Error("access_session previews require WORKERS_SUBDOMAIN and BETTER_AUTH_URL."),
+        );
+      }
+      if (!(yield* optionalVar("ACCESS_ALLOWED_EMAILS"))) {
+        return yield* Effect.die(
+          new Error("access_session previews require ACCESS_ALLOWED_EMAILS."),
+        );
+      }
+      if (!(yield* optionalSecret("BETTER_AUTH_SECRET"))) {
+        return yield* Effect.die(
+          new Error("access_session previews require BETTER_AUTH_SECRET."),
+        );
+      }
+    }
+
     const access = yield* resolveSelfHostAccess(
       stage,
-      authMode === "cloudflare_access" && !prod,
+      (authMode === "cloudflare_access" || authMode === "access_session") && !prod,
       workersSubdomain,
     );
 
