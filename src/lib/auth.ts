@@ -20,6 +20,7 @@ import {
   hasHostedTurnstileConfig,
 } from "@/lib/auth-turnstile";
 import { resolveSignInHostedOrganization } from "@/server/auth/default-hosted-organization";
+import { resolveSharedWorkspaceContext } from "@/middleware/ensure-user/delegated";
 import { onInvitationAccepted } from "@/server/auth/invited-member";
 import { AuthRepository } from "@/server/auth/repositories/AuthRepository";
 import { captureDubReferralSignup } from "@/server/referrals/dub";
@@ -174,6 +175,10 @@ function createAuth() {
       : {}),
     emailAndPassword: {
       ...baseAuthConfig.emailAndPassword,
+      enabled: !isAccessSessionAuthMode(env.AUTH_MODE),
+      disableSignUp:
+        isAccessSessionAuthMode(env.AUTH_MODE) ||
+        baseAuthConfig.emailAndPassword.disableSignUp,
       requireEmailVerification: !bypassEmail,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
@@ -184,7 +189,7 @@ function createAuth() {
         });
       },
     },
-    emailVerification: bypassEmail
+    emailVerification: bypassEmail || isAccessSessionAuthMode(env.AUTH_MODE)
       ? undefined
       : {
           sendOnSignUp: true,
@@ -248,7 +253,25 @@ function createAuth() {
       session: {
         create: {
           before: async (session) => {
-            // Runs on every sign-in (each sign-in mints a session row).
+            if (isAccessSessionAuthMode(env.AUTH_MODE)) {
+              const user = await AuthRepository.getHostedUser(session.userId);
+              if (!user?.email) {
+                throw new Error("Access-session user record is missing");
+              }
+              const context = await resolveSharedWorkspaceContext(
+                user.id,
+                user.email,
+              );
+              return {
+                data: {
+                  ...session,
+                  activeOrganizationId: context.organizationId,
+                },
+              };
+            }
+
+            // Hosted sessions use the user's last-active organization. Access
+            // sessions stay in the shared workspace used by Cloudflare Access.
             // Resolution order: last-active org while still a member → most
             // recently joined org → newly created default organization —
             // except that a membership-less user with a pending invitation
