@@ -176,6 +176,7 @@ const accessScopeHint =
  */
 const resolveSelfHostAccess = (
   stage: string,
+  authMode: string,
   provision: boolean,
   workersSubdomain: string,
 ) =>
@@ -382,6 +383,7 @@ export default Alchemy.Stack(
 
     const access = yield* resolveSelfHostAccess(
       stage,
+      authMode,
       (authMode === "cloudflare_access" || authMode === "access_session") && !prod,
       workersSubdomain,
     );
