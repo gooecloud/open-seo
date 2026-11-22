@@ -14,6 +14,7 @@ import { useGoogleAuth } from "@/client/features/auth/useGoogleAuth";
 import { getFormError } from "@/client/lib/forms";
 import { captureClientEvent } from "@/client/lib/posthog";
 import { authClient } from "@/lib/auth-client";
+import { isAccessSessionClientAuthMode } from "@/lib/auth-mode";
 import {
   getSignInSearch,
   getVerifyEmailSearch,
@@ -37,6 +38,7 @@ function SignInPage() {
   const { redirectTo, oauthQuery, isHostedMode } = useAuthPageState(
     search.redirect,
   );
+  const isAccessSessionMode = isAccessSessionClientAuthMode();
   const [showEmailForm, setShowEmailForm] = useState(false);
   const google = useGoogleAuth({ redirectTo });
 
@@ -99,6 +101,30 @@ function SignInPage() {
       }
     },
   });
+
+  if (isAccessSessionMode) {
+    return (
+      <AuthPageCard
+        title="Sign in to OpenSEO"
+        helperText="Continue with your company account to start a secure session."
+      >
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() => {
+            const loginUrl = new URL(
+              "/api/auth/access-session/login",
+              window.location.origin,
+            );
+            loginUrl.searchParams.set("returnTo", redirectTo);
+            window.location.assign(loginUrl.toString());
+          }}
+        >
+          Continue with company account
+        </Button>
+      </AuthPageCard>
+    );
+  }
 
   return (
     <AuthPageCard
