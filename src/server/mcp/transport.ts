@@ -202,6 +202,7 @@ export async function handleAuthenticatedOpenSeoMcpRequest(
     ? await resolveAccessSessionOAuthContext(
         authContext.userId,
         authContext.userEmail,
+        authContext.sessionId,
       )
     : await resolveRequestOrganization(
         authContext.userId,
