@@ -7,6 +7,9 @@ import { buildDashboardUrl } from "@/server/mcp/urls";
 export type ToolAuthContext = {
   userId: string;
   userEmail: string;
+  // Better Auth session that authorized this OAuth grant. Access-session mode
+  // checks this exact row on token exchange and every MCP request.
+  sessionId?: string;
   organizationId: string;
   // Org role for permission gates (owner/admin/member, comma-joined when
   // multiple). Hosted: stamped per request from the member row in
@@ -45,6 +48,7 @@ export const MCP_ROUTE = "/mcp";
 const applicationAuthContextSchema = z.object({
   userId: z.string().min(1),
   userEmail: z.string().min(1),
+  sessionId: z.string().min(1).optional(),
   organizationId: z.string().min(1),
   // Absent from OAuth grant props (role is stamped per request by the hosted
   // transport, never baked into tokens) and from delegated modes (implicit
