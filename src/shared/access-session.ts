@@ -27,10 +27,35 @@ export function resolveAccessIdentityUserId(input: {
   };
 }
 
+export function isAccessSessionGrantSessionMatch(input: {
+  grantSessionId?: string | null;
+  grantUserId?: string | null;
+  sessionId?: string | null;
+  sessionUserId?: string | null;
+  expiresAt?: Date | null;
+  now?: Date;
+}) {
+  if (
+    !input.grantSessionId ||
+    !input.grantUserId ||
+    !input.sessionId ||
+    !input.sessionUserId ||
+    !input.expiresAt
+  ) {
+    return false;
+  }
+
+  return (
+    input.grantSessionId === input.sessionId &&
+    input.grantUserId === input.sessionUserId &&
+    input.expiresAt.getTime() > (input.now ?? new Date()).getTime()
+  );
+}
+
 export function isAccessSessionEmailAllowed(
   email: string,
   allowlist: string | undefined,
-) {
+)
   return new Set(
     (allowlist ?? "")
       .split(",")
