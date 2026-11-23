@@ -1,4 +1,4 @@
-import { and, eq, gt, like } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { db } from "@/db";
 import { session as authSession, user as authUser } from "@/db/schema";
