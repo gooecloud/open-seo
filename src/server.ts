@@ -210,8 +210,10 @@ export default {
     _ctx: ExecutionContext,
   ) {
     if (controller.cron === MCP_OAUTH_PURGE_CRON) {
-      // Only hosted mode runs the OAuth provider (and has OAUTH_KV bound).
-      if (isHostedAuthMode(getAuthMode(env.AUTH_MODE))) {
+      // Hosted and access_session modes both run the OAuth provider and bind
+      // OAUTH_KV; self-hosted Cloudflare Access and local_noauth do not.
+      const authMode = getAuthMode(env.AUTH_MODE);
+      if (isHostedAuthMode(authMode) || isAccessSessionAuthMode(authMode)) {
         const result = await openSeoOAuthProvider.purgeExpiredData(
           env as OpenSeoOAuthEnv,
         );
