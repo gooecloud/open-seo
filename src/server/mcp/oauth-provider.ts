@@ -27,6 +27,10 @@ import {
 import { normalizeClientRegistrationRequest } from "@/server/mcp/oauth-registration";
 import { getPublicOrigin } from "@/server/mcp/public-origin";
 import { resolveUserContextFromHeaders } from "@/middleware/ensure-user/resolve";
+import {
+  resolveAccessSessionGrantIdentity,
+  resolveAccessSessionOAuthContext,
+} from "@/server/auth/access-session";
 import { handleMcpApiKeyRequest } from "@/server/mcp/api-key-auth";
 
 const OAUTH_AUTHORIZE_PATH = "/api/auth/oauth2/authorize";
@@ -330,6 +334,19 @@ async function handleOAuthConsentResponse(
     return jsonResponse({ error: "Sign in required" }, { status: 401 });
   }
 
+  const accessSessionIdentity = isAccessSessionAuthMode(env.AUTH_MODE)
+    ? await resolveAccessSessionGrantIdentity(request.headers)
+    : null;
+  if (
+    isAccessSessionAuthMode(env.AUTH_MODE) &&
+    (!accessSessionIdentity ||
+      accessSessionIdentity.userId !== context.userId ||
+      accessSessionIdentity.userEmail.trim().toLowerCase() !==
+        context.userEmail.trim().toLowerCase())
+  ) {
+    return jsonResponse({ error: "A valid SEO login session is required" }, { status: 401 });
+  }
+
   let scopes: string[];
   try {
     scopes = getGrantedMcpScopes(authRequest.scope);
@@ -348,6 +365,9 @@ async function handleOAuthConsentResponse(
   const props = createWorkersOAuthMcpProps({
     userId: context.userId,
     userEmail: context.userEmail,
+    ...(accessSessionIdentity
+      ? { sessionId: accessSessionIdentity.sessionId }
+      : {}),
     organizationId: context.organizationId,
     baseUrl: getHostedBaseUrl(),
     clientId: authRequest.clientId,
@@ -427,7 +447,7 @@ function createProvider(appFetch: AppFetch, resource: string) {
       scopes_supported: [MCP_SCOPE],
       resource_name: "OpenSEO MCP",
     },
-    tokenExchangeCallback: ({ props, requestedScope }) => {
+    tokenExchangeCallback: async ({ props, requestedScope }) => {
       if (!requestedScope.includes(MCP_SCOPE)) {
         throw new OAuthError("invalid_scope", {
           description: "The mcp scope is required",
@@ -436,6 +456,23 @@ function createProvider(appFetch: AppFetch, resource: string) {
 
       const authContext =
         workersOAuthMcpPropsSchema.parse(props)[MCP_AUTH_CONTEXT_PROP];
+
+      // The callback runs for both authorization-code exchange and refresh
+      // token exchange. A revoked Better Auth session must not mint fresh MCP
+      // access tokens from an otherwise still-live OAuth refresh token.
+      if (isAccessSessionAuthMode(env.AUTH_MODE)) {
+        const activeSession = await resolveAccessSessionOAuthContext(
+          authContext.userId,
+          authContext.userEmail,
+          authContext.sessionId,
+        );
+        if (!activeSession) {
+          throw new OAuthError("invalid_grant", {
+            description: "The OpenSEO login session has expired or been revoked.",
+          });
+        }
+      }
+
       return {
         accessTokenProps: createWorkersOAuthMcpProps({
           ...authContext,
