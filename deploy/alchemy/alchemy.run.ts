@@ -369,9 +369,30 @@ export default Alchemy.Stack(
           new Error("access_session previews require WORKERS_SUBDOMAIN and BETTER_AUTH_URL."),
         );
       }
-      if (!(yield* optionalVar("ACCESS_ALLOWED_EMAILS"))) {
+      const allowedEmails = (yield* optionalVar("ACCESS_ALLOWED_EMAILS"))
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+      const adminEmails = (yield* optionalVar("ACCESS_SESSION_ADMIN_EMAILS"))
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowedEmails.length === 0) {
         return yield* Effect.die(
           new Error("access_session previews require ACCESS_ALLOWED_EMAILS."),
+        );
+      }
+      if (
+        adminEmails.length === 0 ||
+        adminEmails.some((email) => !allowedEmails.includes(email))
+      ) {
+        return yield* Effect.die(
+          new Error("ACCESS_SESSION_ADMIN_EMAILS must contain at least one email from ACCESS_ALLOWED_EMAILS."),
+        );
+      }
+      if (!(yield* optionalVar("TEAM_DOMAIN")) || !(yield* optionalVar("POLICY_AUD"))) {
+        return yield* Effect.die(
+          new Error("access_session previews require TEAM_DOMAIN and POLICY_AUD from the persistent preview Access application. Run pnpm preview:access first."),
         );
       }
       if (!(yield* optionalSecret("BETTER_AUTH_SECRET"))) {
@@ -384,7 +405,7 @@ export default Alchemy.Stack(
     const access = yield* resolveSelfHostAccess(
       stage,
       authMode,
-      (authMode === "cloudflare_access" || authMode === "access_session") && !prod,
+      authMode === "cloudflare_access" && !prod,
       workersSubdomain,
     );
 
