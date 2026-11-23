@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getSafeAccessSessionReturnTo,
   isAccessSessionEmailAllowed,
+  isAccessSessionGrantSessionMatch,
   normalizeAccessEmail,
   resolveAccessIdentityUserId,
 } from "./access-session";
@@ -83,5 +84,69 @@ describe("Access identity mapping", () => {
         emailUserId: "different-user",
       }),
     ).toEqual({ userId: "subject-user", emailConflict: true });
+  });
+});
+
+
+describe("Access OAuth grant session binding", () => {
+  const now = new Date("2026-11-23T00:00:00.000Z");
+
+  it("accepts only the exact live session for the same user", () => {
+    expect(
+      isAccessSessionGrantSessionMatch({
+        grantSessionId: "session-1",
+        grantUserId: "user-1",
+        sessionId: "session-1",
+        sessionUserId: "user-1",
+        expiresAt: new Date("2026-11-24T00:00:00.000Z"),
+        now,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a missing or different session id", () => {
+    expect(
+      isAccessSessionGrantSessionMatch({
+        grantSessionId: "session-1",
+        grantUserId: "user-1",
+        sessionId: null,
+        sessionUserId: "user-1",
+        expiresAt: new Date("2026-11-24T00:00:00.000Z"),
+        now,
+      }),
+    ).toBe(false);
+    expect(
+      isAccessSessionGrantSessionMatch({
+        grantSessionId: "session-1",
+        grantUserId: "user-1",
+        sessionId: "session-2",
+        sessionUserId: "user-1",
+        expiresAt: new Date("2026-11-24T00:00:00.000Z"),
+        now,
+      }),
+    ).toBe(false);
+  });
+
+  it("rejects a different user and an expired session", () => {
+    expect(
+      isAccessSessionGrantSessionMatch({
+        grantSessionId: "session-1",
+        grantUserId: "user-1",
+        sessionId: "session-1",
+        sessionUserId: "user-2",
+        expiresAt: new Date("2026-11-24T00:00:00.000Z"),
+        now,
+      }),
+    ).toBe(false);
+    expect(
+      isAccessSessionGrantSessionMatch({
+        grantSessionId: "session-1",
+        grantUserId: "user-1",
+        sessionId: "session-1",
+        sessionUserId: "user-1",
+        expiresAt: new Date("2026-11-22T00:00:00.000Z"),
+        now,
+      }),
+    ).toBe(false);
   });
 });
