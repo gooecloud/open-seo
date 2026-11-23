@@ -28,17 +28,15 @@ export function useHostedAuthRouteGuard() {
     const redirectTo = getCurrentAuthRedirectFromHref(window.location.href);
 
     if (!session?.user?.id) {
-      if (isAccessSessionMode) {
-        const loginUrl = new URL("/api/auth/access-session/login", window.location.origin);
-        loginUrl.searchParams.set("returnTo", redirectTo);
-        window.location.assign(loginUrl.toString());
-      } else {
-        void navigate({
-          to: "/sign-in",
-          search: getSignInSearch(redirectTo),
-          replace: true,
-        });
-      }
+      // Do not silently re-enter Cloudflare Access after sign-out. The sign-in
+      // page exposes an explicit "Continue with company account" action, so
+      // users can end the application session while their Access SSO remains
+      // active in the browser.
+      void navigate({
+        to: "/sign-in",
+        search: getSignInSearch(redirectTo),
+        replace: true,
+      });
       return;
     }
 
