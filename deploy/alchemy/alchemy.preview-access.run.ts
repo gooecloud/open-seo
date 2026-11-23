@@ -1,5 +1,6 @@
 import * as Alchemy from "alchemy";
 import * as Cloudflare from "alchemy/Cloudflare";
+import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
 import {
   emailAccessGate,
@@ -26,6 +27,12 @@ export default Alchemy.Stack(
   },
   Effect.gen(function* () {
     const subdomain = yield* readWorkersSubdomain({ required: true });
+    const teamDomain = (yield* Config.string("TEAM_DOMAIN")).trim();
+    if (!teamDomain.startsWith("https://")) {
+      return yield* Effect.die(
+        new Error("TEAM_DOMAIN must be the HTTPS Cloudflare Access team domain."),
+      );
+    }
     const allowedEmails = yield* requireAllowedEmails(
       "Set ACCESS_ALLOWED_EMAILS to the comma-separated preview testers.",
     );
@@ -42,6 +49,7 @@ export default Alchemy.Stack(
 
     return {
       hostname,
+      teamDomain,
       applicationId: application.applicationId,
       aud: application.aud,
     };
