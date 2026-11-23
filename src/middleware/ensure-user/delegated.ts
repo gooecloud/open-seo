@@ -6,6 +6,10 @@ import {
 } from "@/server/auth/delegated-organization";
 import { AppError } from "@/server/lib/errors";
 import { eq, sql } from "drizzle-orm";
+import {
+  normalizeAccessEmail,
+  resolveAccessIdentityUserId,
+} from "@/shared/access-session";
 import type { EnsuredUserContext } from "./types";
 
 const LOCAL_ADMIN_USER_ID = "local-admin";
@@ -31,7 +35,7 @@ async function ensureUserRecord(
   accessEmail: string,
 ): Promise<{ userId: string; email: string }> {
   const email = accessEmail.trim();
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = normalizeAccessEmail(email);
 
   // Cloudflare Access `sub` is its stable identity subject, not necessarily
   // the Better Auth user id. Prefer the subject mapping when it already
@@ -42,16 +46,26 @@ async function ensureUserRecord(
     where: eq(user.id, accessSubject),
   });
 
-  if (existingBySubject) {
-    if (existingBySubject.email.trim().toLowerCase() !== normalizedEmail) {
-      const emailOwner = await findUserByEmail(email);
-      if (emailOwner && emailOwner.id !== existingBySubject.id) {
-        throw new AppError(
-          "UNAUTHENTICATED",
-          "Cloudflare Access identity email is already linked to another user",
-        );
-      }
+  // Older self-hosted/hosted records may predate the Access subject id. Reuse
+  // the existing Better Auth user by case-insensitive email rather than
+  // creating a second user that collides with the unique email constraint.
+  const existingByEmail = await findUserByEmail(email);
+  const identity = resolveAccessIdentityUserId({
+    accessEmail: email,
+    subjectUserId: existingBySubject?.id,
+    subjectEmail: existingBySubject?.email,
+    emailUserId: existingByEmail?.id,
+  });
 
+  if (identity.emailConflict) {
+    throw new AppError(
+      "UNAUTHENTICATED",
+      "Cloudflare Access identity email is already linked to another user",
+    );
+  }
+
+  if (existingBySubject) {
+    if (normalizeAccessEmail(existingBySubject.email) !== normalizedEmail) {
       await db
         .update(user)
         .set({ email, name: deriveUserName(email) })
@@ -61,13 +75,9 @@ async function ensureUserRecord(
     return { userId: existingBySubject.id, email };
   }
 
-  // Older self-hosted/hosted records may predate the Access subject id. Reuse
-  // the existing Better Auth user by case-insensitive email rather than
-  // creating a second user that collides with the unique email constraint.
-  const existingByEmail = await findUserByEmail(email);
   if (existingByEmail) {
     return {
-      userId: existingByEmail.id,
+      userId: identity.userId!,
       email: existingByEmail.email,
     };
   }
