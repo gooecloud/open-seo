@@ -78,6 +78,12 @@ jobs:
         if: github.event.action != 'closed'
         run: |
           subdomain=$(grep '^WORKERS_SUBDOMAIN=' .env.preview | cut -d= -f2-)
+          team_domain=$(grep '^TEAM_DOMAIN=' .env.preview | cut -d= -f2-)
+          policy_aud=$(grep '^POLICY_AUD=' .env.preview | cut -d= -f2-)
+          if [ -z "$team_domain" ] || [ -z "$policy_aud" ]; then
+            echo "::error::ENV_PREVIEW must include TEAM_DOMAIN and POLICY_AUD from the persistent preview Access app (run pnpm preview:access first)"
+            exit 1
+          fi
           case "$subdomain" in
             *.workers.dev) ;;
             *) echo "::error::ENV_PREVIEW secret is missing a valid WORKERS_SUBDOMAIN (needed to derive and verify the preview URL)"; exit 1 ;;
